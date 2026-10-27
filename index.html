@@ -42,6 +42,11 @@ input[type=text],input[type=date],input[type=search],select,textarea{font-family
 input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:18px}
 .bar .grow{flex:1 1 200px}
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin:-6px 0 18px}
+.seg button{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:13px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:4px 14px;cursor:pointer}
+.seg button:hover{border-color:var(--accent)}
+.seg button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.seg .m{font-family:var(--f-mono);font-size:11px;opacity:.75}
 .back{display:inline-block;margin-bottom:6px;font-size:13px;color:var(--muted);text-decoration:none;background:none;border:0;padding:0;cursor:pointer}
 .back:hover{color:var(--ink)}
 .list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
@@ -181,7 +186,8 @@ async function publish(message){
 /* ---- state ---- */
 // 通常は閲覧専用。URL に ?edit を付けて開くと編集できる（保存にはトークンが必要）
 const EDIT = /[?&]edit\b/.test(location.search);
-let reports = [], view = {name:'list'}, draft = null, query = '';
+let reports = [], view = {name:'list'}, draft = null, query = '', role = 'all';
+const isKp = r => /えの|eno/i.test(r.gm || "");
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const blank = () => ({id: uid(), title:'', date: today(), gm:'', kpc:'', result:'', table:'', system:'Call of Cthulhu', players:[{ho:'HO1', pl:'', pc:'', status:'生還'}], shots:[], created: Date.now()});
@@ -267,16 +273,22 @@ function card(r){
 }
 function renderList(){
   const q = query.trim().toLowerCase();
-  const rows = reports.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.created - a.created)
-    .filter(r => !q || [r.title, r.gm, r.kpc, r.result, r.table, r.system, ...r.players.flatMap(p => [p.pl, p.pc, p.ho])].join(' ').toLowerCase().includes(q));
+  const sorted = reports.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.created - a.created);
+  const cnt = {all: sorted.length, kp: sorted.filter(isKp).length};
+  cnt.pl = cnt.all - cnt.kp;
+  const rows = sorted
+    .filter(r => role === 'all' || (role === 'kp') === isKp(r))
+    .filter(r => !q ||[r.title, r.gm, r.kpc, r.result, r.table, r.system, ...r.players.flatMap(p => [p.pl, p.pc, p.ho])].join(' ').toLowerCase().includes(q));
   app.innerHTML = `
     <div class="bar noprint">
       <input class="grow" type="search" id="q" placeholder="シナリオ名・GM・PL・PC名で検索" value="${esc(query)}" aria-label="検索">
       ${EDIT ? `<button class="primary" data-act="new">${ico('plus')}新しい報告</button>` : ''}
     </div>
+    <div class="seg noprint" role="group" aria-label="絞り込み">${[['all', 'すべて'], ['kp', 'KP卓'], ['pl', 'PL卓']].map(([k, t]) => `<button type="button" data-role="${k}" aria-pressed="${role === k}">${t}<span class="m">${cnt[k]}</span></button>`).join('')}</div>
     ${rows.length ? `<ul class="list">${rows.map(card).join('')}</ul>`
       : `<div class="empty">${reports.length ? '該当する報告がありません。' : 'まだ報告がありません。'}</div>`}
     ${EDIT ? `<div class="actions noprint"><button data-act="token">${ico('save')}GitHub連携（${getToken() ? '設定済み' : '未設定'}）</button></div>` : ''}`;
+  app.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => { role = b.dataset.role; renderList(); }));
   const qi = $('#q');
   qi.addEventListener('input', () => { query = qi.value; const pos = qi.selectionStart; renderList(); const n = $('#q'); n.focus(); n.setSelectionRange(pos, pos); });
 }
