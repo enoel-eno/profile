@@ -69,11 +69,11 @@ ul.items .ho{font-size:11px;color:var(--muted);margin-left:6px;white-space:nowra
     <p class="eyebrow">PROFILE</p>
     <div class="who"><img src="profile/avatar.png" alt=""><h1 id="name">えのプロフ</h1></div>
   </header>
-  <div class="cover"><img src="profile/cover.jpg" alt=""><a class="go" href="reports.html"><svg class="i" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>卓報告一覧</a></div>
+  <div class="cover"><img src="profile/cover.jpg" alt=""><a class="go" href="session-log.html"><svg class="i" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>卓報告一覧</a></div>
   <main id="app"></main>
 </div>
 <script>
-if(/[?&](edit|r=)/.test(location.search)) location.replace('reports.html' + location.search);
+if(/[?&](edit|r=)/.test(location.search)) location.replace('session-log.html' + location.search);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 fetch('profile/profile-data.json?t=' + Date.now()).then(r => r.json()).then(d => {
   document.getElementById('name').textContent = d.name;
