@@ -345,7 +345,6 @@ function renderDetail(){
     <div class="actions noprint">
       ${EDIT ? `<button class="primary" data-act="edit">${ico('edit')}編集</button>` : ''}
       <button data-act="copytext">${ico('copy')}報告文をコピー</button>
-      <button data-act="savehtml">${ico('save')}HTMLで保存</button>
       ${EDIT ? `<button class="danger ghost" data-act="del" style="margin-left:auto">${ico('trash')}削除</button>` : ''}
     </div>`;
 }
@@ -411,18 +410,6 @@ function syncDraft(){
 }
 
 /* ---- export ---- */
-function saveFile(name, type, content){
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content], {type})); a.download = name;
-  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-function exportHtml(r){
-  const rd = app.querySelector('.read'), body = rd ? rd.outerHTML.split('src="images/').join(`src="${SITE}images/`) : '';
-  const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>${esc(r.title || '卓報告')}</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap">
-<style>${$('#css').textContent}</style></head><body><div class="wrap"><header><p class="eyebrow">SESSION REPORT</p><h1>卓報告</h1></header>${body}</div>
-<dialog id="lb"><img alt=""></dialog><script>document.addEventListener('click',function(e){var t=e.target.closest('[data-zoom]');if(!t)return;var d=document.getElementById('lb');d.querySelector('img').src=t.src;d.showModal()});document.getElementById('lb').addEventListener('click',function(){this.close()})<\/script></body></html>`;
-  saveFile(`${(r.date || '')}_${(r.title || '卓報告').replace(/[\\/:*?"<>|]/g, '_')}.html`, 'text/html', html);
-}
 function openToken(){
   $('#tk-in').value = ''; $('#tk-state').textContent = getToken() ? '設定済みです（入力すると置き換えます）。' : '未設定です。';
   $('#tk').showModal();
@@ -449,7 +436,6 @@ document.addEventListener('click', async e => {
     case 'cancel': go(reports.some(x => x.id === draft.id) ?{name:'detail', id: draft.id} : {name:'list'}); break;
     case 'addp': syncDraft(); draft.players.push({ho:'HO' + (draft.players.length + 1), pl:'', pc:''}); renderEdit(); break;
     case 'copytext': copy(reportText(r)); break;
-    case 'savehtml': exportHtml(r); break;
     case 'del':
       if(!getToken()) return openToken();
       if(confirm(`「${r.title || '無題'}」を削除します。`)){
