@@ -99,6 +99,26 @@ table.pt tr:last-child td{border-bottom:0}
 dl.info{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin:0}
 dl.info dt{color:var(--muted);font-size:13px}
 dl.info dd{margin:0;font-weight:500}
+.read{margin-top:6px}
+.read+.actions{margin-top:32px}
+.hero{position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--soft)}
+.hero:not(.has){border:0;background:none;border-radius:0}
+.hero img{display:block;width:100%;aspect-ratio:16/8;object-fit:cover;cursor:zoom-in}
+.hero h2{font-family:var(--f-display);font-weight:800;letter-spacing:.04em;line-height:1.35;margin:0;font-size:clamp(24px,5vw,34px)}
+.hero.has h2{position:absolute;left:0;right:0;bottom:0;padding:48px 22px 18px;color:#fff;background:linear-gradient(to top,rgba(0,0,0,.7),rgba(0,0,0,0));text-shadow:0 1px 4px rgba(0,0,0,.5);pointer-events:none}
+.rmeta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;margin:14px 2px 0;color:var(--muted);font-size:14px}
+.rmeta .m{font-family:var(--f-mono);font-size:13px;color:var(--ink)}
+.rmeta .res{color:var(--ink);font-weight:700;border:1px solid var(--line);border-radius:99px;padding:0 10px;font-size:13px;background:var(--soft)}
+.credits{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;margin:28px 2px 0;padding-top:24px;border-top:1px solid var(--line)}
+.credits section{min-width:0}
+.credits h3,.gal h3{font-family:var(--f-body);font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted);margin:0 0 8px}
+.credits p{margin:0;font-size:15px;line-height:1.8}
+.gal{margin:32px 0 0;padding-top:24px;border-top:1px solid var(--line)}
+.gal>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.gal figure{margin:0}
+.gal img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:8px;cursor:zoom-in}
+.gal figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+@media (max-width:620px){.credits{grid-template-columns:minmax(0,1fr);gap:20px}.gal>div{grid-template-columns:minmax(0,1fr)}.hero.has h2{padding:36px 14px 12px}}
 .actions{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}
 dialog{border:0;background:transparent;padding:0;max-width:96vw;max-height:96vh}
 dialog::backdrop{background:rgba(0,0,0,.75)}
@@ -308,24 +328,20 @@ function renderList(){
 function renderDetail(){
   const r = reports.find(x => x.id === view.id);
   if(!r) return go({name:'list'});
-  const ps = r.players.filter(p => p.pl || p.pc);
+  const ps = r.players.filter(p => p.pl || p.pc), cv = r.shots[0], rest = r.shots.slice(1);
+  const meta = [r.system, r.table].filter(Boolean);
   app.innerHTML = `
     <button class="back noprint" data-act="list">← 一覧に戻る</button>
-    <div class="panel">
-      <h3 style="font-size:24px;margin-bottom:14px">${esc(r.title || '無題')}</h3>
-      <dl class="info">
-        <dt>日付</dt><dd class="m" style="font-family:var(--f-mono)">${fmtDate(r.date)}</dd>
-        ${r.system ? `<dt>システム</dt><dd>${esc(r.system)}</dd>` : ''}
-        ${r.table ? `<dt>卓名</dt><dd>${esc(r.table)}</dd>` : ''}
-        ${r.gm ? `<dt>${r.role || 'KP'}</dt><dd>${esc(r.gm)}</dd>` : ''}
-        ${r.kpc ? `<dt>${r.role === 'DL' ? 'DPC' : 'KPC'}</dt><dd>${esc(r.kpc)}</dd>` : ''}
-        ${r.result ? `<dt>結果</dt><dd>${esc(r.result)}</dd>` : ''}
-      </dl>
-    </div>
-    ${ps.length ? `<div class="panel"><h3>参加者とPC</h3><table class="pt"><thead><tr><th>HO</th><th>PC</th><th>PL</th></tr></thead><tbody>
-      ${ps.map(p => `<tr><td>${esc(p.ho)}</td><td>${esc(p.pc)}</td><td>${esc(p.pl)}</td></tr>`).join('')}</tbody></table></div>` : ''}
-    ${r.shots.length ? `<div class="panel"><h3>スクリーンショット</h3><div class="shots">${r.shots.map(s =>
-      `<figure class="shot" style="margin:0"><img src="${s.data}" alt="${esc(s.caption || 'スクリーンショット')}" data-zoom="${s.id}">${s.caption ? `<div class="cap"><p>${esc(s.caption)}</p></div>` : ''}</figure>`).join('')}</div></div>` : ''}
+    <article class="read">
+      <div class="hero${cv ? ' has' : ''}">${cv ? `<img src="${cv.data}" alt="" data-zoom="${cv.id}">` : ''}<h2>${esc(r.title || '無題')}</h2></div>
+      <p class="rmeta"><span class="m">${fmtDate(r.date)}</span>${meta.map(t => `<span>${esc(t)}</span>`).join('')}${r.result ? `<span class="res">${esc(r.result)}</span>` : ''}</p>
+      <div class="credits">
+        ${r.gm || r.kpc ? `<section><h3>${r.kpc ? roleLabel(r) : (r.role || 'KP')}</h3><p>${esc(r.kpc ? r.kpc + ' - ' + r.gm : r.gm)}</p></section>` : ''}
+        ${ps.length ? `<section><h3>PC - PL</h3>${ps.map(p => `<p>${esc(pcLine(p))}</p>`).join('')}</section>` : ''}
+      </div>
+      ${rest.length ? `<section class="gal"><h3>スクリーンショット</h3><div>${rest.map(s =>
+        `<figure><img src="${s.data}" alt="${esc(s.caption || 'スクリーンショット')}" data-zoom="${s.id}" loading="lazy">${s.caption ? `<figcaption>${esc(s.caption)}</figcaption>` : ''}</figure>`).join('')}</div></section>` : ''}
+    </article>
     <div class="actions noprint">
       ${EDIT ? `<button class="primary" data-act="edit">${ico('edit')}編集</button>` : ''}
       <button data-act="copytext">${ico('copy')}報告文をコピー</button>
@@ -400,7 +416,7 @@ function saveFile(name, type, content){
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 function exportHtml(r){
-  const body = app.querySelector('.panel') ? [...app.children].filter(el => !el.classList.contains('noprint') && !el.classList.contains('back')).map(el => el.outerHTML).join('') : '';
+  const rd = app.querySelector('.read'), body = rd ? rd.outerHTML.split('src="images/').join(`src="${SITE}images/`) : '';
   const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>${esc(r.title || '卓報告')}</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap">
 <style>${$('#css').textContent}</style></head><body><div class="wrap"><header><p class="eyebrow">SESSION REPORT</p><h1>卓報告</h1></header>${body}</div>
