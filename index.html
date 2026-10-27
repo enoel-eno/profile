@@ -123,6 +123,15 @@ footer{margin-top:36px;font-size:12px;color:var(--muted)}
   <footer class="noprint" id="foot"></footer>
 </div>
 <dialog id="lb"><img alt=""></dialog>
+<dialog id="tk" style="background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:min(480px,92vw)">
+  <form method="dialog">
+    <h3 style="font-family:var(--f-display);font-weight:800;margin:0 0 8px">GitHub連携</h3>
+    <p class="note" style="margin:0 0 10px">保存先のリポジトリ <b>enoel-eno/session-log</b> だけに、<b>Contents: Read and write</b> の権限を付けたトークンを作って貼り付けてください。<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener" style="color:var(--ink)">トークンを作る</a>　このブラウザの中にだけ保存されます。</p>
+    <p class="note" id="tk-state" style="margin:0 0 8px"></p>
+    <input type="password" id="tk-in" placeholder="github_pat_…" autocomplete="off" aria-label="トークン">
+    <div class="actions"><button class="primary" value="ok">保存</button><button value="clear" class="danger">解除</button><button value="cancel">閉じる</button></div>
+  </form>
+</dialog>
 <datalist id="rlist"><option value="全員生還"><option value="両生還"><option value="一部ロスト"><option value="全ロスト"></datalist>
 <datalist id="stlist"><option value="生還"><option value="ロスト"><option value="発狂"><option value="行方不明"><option value="死亡"><option value="不定の狂気"></datalist>
 
@@ -143,28 +152,35 @@ const IC = {
 };
 const ico = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
 
-/* ---- storage (IndexedDB: スクリーンショットが大きいので localStorage は使わない) ---- */
-let db;
-function openDb(){
-  return new Promise((res, rej) => {
-    const r = indexedDB.open('takuhokoku', 1);
-    r.onupgradeneeded = () => r.result.createObjectStore('reports', {keyPath:'id'});
-    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
-  });
+/* ---- 保存先: GitHub（データ本体と表紙画像をこのリポジトリにコミットする） ---- */
+const REPO = 'enoel-eno/session-log', BRANCH = 'main', DATA = 'takuhokoku-data.json', TOKEN_KEY = 'takuhokoku-token';
+const getToken = () => { try{ return localStorage.getItem(TOKEN_KEY) || ''; }catch(_){ return ''; } };
+const setToken = t => { try{ t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); }catch(_){} };
+const b64 = s => { const b = new TextEncoder().encode(s); let t = ''; for(let i = 0; i < b.length; i += 0x8000) t += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(t); };
+const unb64 = s => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g, '')), c => c.charCodeAt(0)));
+async function gh(path, opt = {}){
+  const url = `https://api.github.com/repos/${REPO}/contents/${path}` + (opt.method ? '' : `?ref=${BRANCH}&t=${Date.now()}`);
+  const r = await fetch(url, {...opt, headers:{Accept:'application/vnd.github+json', Authorization:'Bearer ' + getToken()}});
+  if(r.status === 404 && !opt.method) return null;
+  if(!r.ok) throw new Error(r.status === 401 ? 'トークンが正しくないか、期限が切れています' : r.status === 403 ? 'このリポジトリに書き込む権限がありません' : r.status === 409 || r.status === 422 ? '他で更新されています。ページを開き直してやり直してください' : `GitHub のエラー（${r.status}）`);
+  return r.json();
 }
-const tx = (mode, fn) => new Promise((res, rej) => {
-  const t = db.transaction('reports', mode), s = t.objectStore('reports'), q = fn(s);
-  t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error);
-});
-// IndexedDB が使えない環境（プレビュー等）では、開いている間だけメモリに保持する
-let mem = [];
-const getAll = () => db ? tx('readonly', s => s.getAll()) : Promise.resolve(mem.slice());
-const putOne = r => db ? tx('readwrite', s => s.put(r)) : (mem = mem.filter(x => x.id !== r.id).concat(r), Promise.resolve());
-const delOne = id => db ? tx('readwrite', s => s.delete(id)) : (mem = mem.filter(x => x.id !== id), Promise.resolve());
+// 画像は images/ に別ファイルでコミットし、データ側にはパスだけを書く
+async function publish(message){
+  for(const r of reports) for(const s of r.shots){
+    if(!s.data.startsWith('data:')) continue;
+    const path = `images/${s.id}.jpg`, cur = await gh(path);
+    await gh(path, {method:'PUT', body: JSON.stringify({message, content: s.data.split(',')[1], branch: BRANCH, ...(cur ? {sha: cur.sha} : {})})});
+    s.path = path;
+  }
+  const out = {version:1, reports: reports.map(r => ({...r, shots: r.shots.map(s => ({id: s.id, caption: s.caption, data: s.path || s.data}))}))};
+  const cur = await gh(DATA);
+  await gh(DATA, {method:'PUT', body: JSON.stringify({message, content: b64(JSON.stringify(out)), branch: BRANCH, ...(cur ? {sha: cur.sha} : {})})});
+}
 
 /* ---- state ---- */
-// 公開ページは閲覧専用。編集は ?edit を付けるか、ローカル（localhost・ファイル）で開いたときだけ
-const EDIT = /[?&]edit\b/.test(location.search) || ['localhost', '127.0.0.1', ''].includes(location.hostname);
+// 通常は閲覧専用。URL に ?edit を付けて開くと編集できる（保存にはトークンが必要）
+const EDIT = /[?&]edit\b/.test(location.search);
 let reports = [], view = {name:'list'}, draft = null, query = '';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
@@ -260,13 +276,9 @@ function renderList(){
     </div>
     ${rows.length ? `<ul class="list">${rows.map(card).join('')}</ul>`
       : `<div class="empty">${reports.length ? '該当する報告がありません。' : 'まだ報告がありません。'}</div>`}
-    ${EDIT ? `<div class="actions noprint">
-      <button data-act="export">${ico('dl')}公開用データを書き出す</button>
-      <label class="filebtn">${ico('ul')}データを読み込む<input type="file" id="imp" accept=".json,application/json"></label>
-    </div>` : ''}`;
+    ${EDIT ? `<div class="actions noprint"><button data-act="token">${ico('save')}GitHub連携（${getToken() ? '設定済み' : '未設定'}）</button></div>` : ''}`;
   const qi = $('#q');
   qi.addEventListener('input', () => { query = qi.value; const pos = qi.selectionStart; renderList(); const n = $('#q'); n.focus(); n.setSelectionRange(pos, pos); });
-  if(EDIT) $('#imp').addEventListener('change', importBackup);
 }
 
 function renderDetail(){
@@ -336,7 +348,15 @@ function renderEdit(){
 
       <div class="actions"><button type="submit" class="primary">${ico('save')}保存</button><button type="button" data-act="cancel">キャンセル</button></div>
     </form>`;
-  $('#f').addEventListener('submit', async e => { e.preventDefault(); syncDraft(); await putOne(draft); reports = await getAll(); toast('保存しました'); go({name:'detail', id: draft.id}); });
+  $('#f').addEventListener('submit', async e => {
+    e.preventDefault(); syncDraft();
+    if(!getToken()) return openToken();
+    const prev = reports.slice(), i = reports.findIndex(x => x.id === draft.id), btn = e.submitter, label = btn.innerHTML;
+    i < 0 ? reports.push(draft) : reports[i] = draft;
+    btn.disabled = true; btn.textContent = '保存中…';
+    try{ await publish(`卓報告：${draft.title || '無題'}を${i < 0 ? '追加' : '更新'}`); toast('保存しました。公開ページへの反映には1分ほどかかります'); go({name:'detail', id: draft.id}); }
+    catch(err){ reports = prev; btn.disabled = false; btn.innerHTML = label; alert('保存できませんでした：' + err.message); }
+  });
   $('#pick').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
   const drop = $('#drop');
   ['dragenter','dragover'].forEach(n => drop.addEventListener(n, e => { e.preventDefault(); drop.classList.add('on'); }));
@@ -364,15 +384,9 @@ function exportHtml(r){
 <dialog id="lb"><img alt=""></dialog><script>document.addEventListener('click',function(e){var t=e.target.closest('[data-zoom]');if(!t)return;var d=document.getElementById('lb');d.querySelector('img').src=t.src;d.showModal()});document.getElementById('lb').addEventListener('click',function(){this.close()})<\/script></body></html>`;
   saveFile(`${(r.date || '')}_${(r.title || '卓報告').replace(/[\\/:*?"<>|]/g, '_')}.html`, 'text/html', html);
 }
-async function importBackup(e){
-  const f = e.target.files[0]; if(!f) return;
-  try{
-    const data = JSON.parse(await f.text());
-    const list = Array.isArray(data) ? data : data.reports;
-    if(!Array.isArray(list)) throw 0;
-    for(const r of list) if(r && r.id && Array.isArray(r.players)) await putOne({shots:[], ...r});
-    reports = await getAll(); toast(`${list.length}件を読み込みました`); renderList();
-  }catch(_){ toast('読み込めませんでした'); }
+function openToken(){
+  $('#tk-in').value = ''; $('#tk-state').textContent = getToken() ? '設定済みです（入力すると置き換えます）。' : '未設定です。';
+  $('#tk').showModal();
 }
 
 /* ---- events ---- */
@@ -398,9 +412,14 @@ document.addEventListener('click', async e => {
     case 'copytext': copy(reportText(r)); break;
     case 'savehtml': exportHtml(r); break;
     case 'del':
-      if(confirm(`「${r.title || '無題'}」を削除します。元に戻せません。`)){ await delOne(r.id); reports = await getAll(); go({name:'list'}); toast('削除しました'); }
+      if(!getToken()) return openToken();
+      if(confirm(`「${r.title || '無題'}」を削除します。`)){
+        const prev = reports.slice(); reports = reports.filter(x => x.id !== r.id);
+        try{ await publish(`卓報告：${r.title || '無題'}を削除`); go({name:'list'}); toast('削除しました'); }
+        catch(err){ reports = prev; alert('削除できませんでした：' + err.message); }
+      }
       break;
-    case 'export': saveFile('takuhokoku-data.json', 'application/json', JSON.stringify({version:1, reports})); break;
+    case 'token': openToken(); break;
   }
 });
 $('#lb').addEventListener('click', () => $('#lb').close());
@@ -410,18 +429,21 @@ document.addEventListener('paste', e => {
   if(files.length){ e.preventDefault(); addFiles(files); }
 });
 
-$('#foot').textContent = EDIT ? '編集モード：入力はこのブラウザに保存されます。「公開用データを書き出す」で出たファイルを takuhokoku-data.json に置き換えると公開に反映されます。' : '';
+$('#tk').addEventListener('submit', e => {
+  const v = $('#tk-in').value.trim(), act = e.submitter && e.submitter.value;
+  if(act === 'cancel') return;
+  if(act === 'clear') setToken(''); else if(v){ setToken(v); location.reload(); return; }
+  if(view.name === 'list') renderList();
+});
+$('#foot').textContent = EDIT ? '編集モード：保存するとGitHubにコミットされ、公開ページには1分ほどで反映されます。' : '';
 (async () => {
-  let base = [];
-  try{ const r = await fetch('takuhokoku-data.json', {cache:'no-cache'}); if(r.ok) base = (await r.json()).reports || []; }catch(_){}
-  if(!EDIT){ reports = base; return render(); }
-  try{ db = await openDb(); }
-  catch(_){ db = null; }
-  reports = await getAll();
-  // 編集用ブラウザの保存先が空なら、公開中のデータを元に始める
-  if(!reports.length && base.length){ for(const r of base) await putOne(r); reports = await getAll(); }
+  let doc = null;
+  // 編集時はGitHubの最新を読む（公開ページは反映まで時間がかかるため）
+  if(EDIT && getToken()){ try{ const f = await gh(DATA); if(f) doc = JSON.parse(unb64(f.content)); }catch(err){ toast(err.message); } }
+  if(!doc){ try{ const r = await fetch(DATA + '?t=' + Date.now()); if(r.ok) doc = await r.json(); }catch(_){} }
+  reports = (doc && doc.reports) || [];
   render();
-  if(!db) toast('この環境では保存できません。「公開用データを書き出す」で残してください');
+  if(EDIT && !getToken()) toast('保存するには「GitHub連携」でトークンを設定してください');
 })();
 </script>
 </body>
