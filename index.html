@@ -171,7 +171,22 @@ async function gh(path, opt = {}){
   return r.json();
 }
 // 画像は images/ に別ファイルでコミットし、データ側にはパスだけを書く
-async function publish(message){
+// 共有用ページ：SNS などに URL を貼るとスクショ付きのカードになる（r/<id>.html。開くと本体のページへ移る）
+const SITE = 'https://enoel-eno.github.io/session-log/';
+const shareUrl = r => `${SITE}r/${r.id}.html`;
+function sharePage(r){
+  const cv = r.shots[0], img = cv ? SITE + (cv.path || cv.data) : '';
+  const desc = [r.kpc ? `${r.kpc} - ${r.gm}` : r.gm, fmtDate(r.date)].filter(Boolean).join(' / ');
+  const t = esc(r.title || '卓報告'), d = esc(desc), to = `../?r=${encodeURIComponent(r.id)}`;
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>${t}</title>
+<meta name="description" content="${d}"><meta property="og:type" content="article"><meta property="og:site_name" content="卓報告"><meta property="og:title" content="${t}"><meta property="og:description" content="${d}"><meta property="og:url" content="${esc(shareUrl(r))}">${img ? `<meta property="og:image" content="${esc(img)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${esc(img)}">` : '<meta name="twitter:card" content="summary">'}
+<meta http-equiv="refresh" content="0;url=${to}"><script>location.replace(${JSON.stringify(to)})<\/script></head><body><a href="${to}">${t}</a></body></html>`;
+}
+async function putFile(path, content, message){
+  const cur = await gh(path);
+  await gh(path, {method:'PUT', body: JSON.stringify({message, content, branch: BRANCH, ...(cur ? {sha: cur.sha} : {})})});
+}
+async function publish(message, saved, removedId){
   for(const r of reports) for(const s of r.shots){
     if(!s.data.startsWith('data:')) continue;
     const path = `images/${s.id}.jpg`, cur = await gh(path);
@@ -181,6 +196,8 @@ async function publish(message){
   const out = {version:1, reports: reports.map(r => ({...r, shots: r.shots.map(s => ({id: s.id, caption: s.caption, data: s.path || s.data}))}))};
   const cur = await gh(DATA);
   await gh(DATA, {method:'PUT', body: JSON.stringify({message, content: b64(JSON.stringify(out)), branch: BRANCH, ...(cur ? {sha: cur.sha} : {})})});
+  if(saved) await putFile(`r/${saved.id}.html`, b64(sharePage(saved)), message);
+  if(removedId){ const f = await gh(`r/${removedId}.html`); if(f) await gh(`r/${removedId}.html`, {method:'DELETE', body: JSON.stringify({message, sha: f.sha, branch: BRANCH})}); }
 }
 
 /* ---- state ---- */
@@ -216,6 +233,7 @@ function reportText(r){
   const ps = r.players.filter(p => p.pl || p.pc);
   if(ps.length) blocks.push([bold('PC - PL'), ...ps.map(pcLine)].join('\n'));
   blocks.push(fmtDate(r.date));
+  blocks.push(shareUrl(r));
   return blocks.join('\n\n');
 }
 
@@ -366,7 +384,7 @@ function renderEdit(){
     const prev = reports.slice(), i = reports.findIndex(x => x.id === draft.id), btn = e.submitter, label = btn.innerHTML;
     i < 0 ? reports.push(draft) : reports[i] = draft;
     btn.disabled = true; btn.textContent = '保存中…';
-    try{ await publish(`卓報告：${draft.title || '無題'}を${i < 0 ? '追加' : '更新'}`); toast('保存しました。公開ページへの反映には1分ほどかかります'); go({name:'detail', id: draft.id}); }
+    try{ await publish(`卓報告：${draft.title || '無題'}を${i < 0 ? '追加' : '更新'}`, draft); toast('保存しました。公開ページへの反映には1分ほどかかります'); go({name:'detail', id: draft.id}); }
     catch(err){ reports = prev; btn.disabled = false; btn.innerHTML = label; alert('保存できませんでした：' + err.message); }
   });
   $('#pick').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
@@ -427,7 +445,7 @@ document.addEventListener('click', async e => {
       if(!getToken()) return openToken();
       if(confirm(`「${r.title || '無題'}」を削除します。`)){
         const prev = reports.slice(); reports = reports.filter(x => x.id !== r.id);
-        try{ await publish(`卓報告：${r.title || '無題'}を削除`); go({name:'list'}); toast('削除しました'); }
+        try{ await publish(`卓報告：${r.title || '無題'}を削除`, null, r.id); go({name:'list'}); toast('削除しました'); }
         catch(err){ reports = prev; alert('削除できませんでした：' + err.message); }
       }
       break;
@@ -454,6 +472,8 @@ $('#foot').textContent = EDIT ? '編集モード：保存するとGitHubにコ�
   if(EDIT && getToken()){ try{ const f = await gh(DATA); if(f) doc = JSON.parse(unb64(f.content)); }catch(err){ toast(err.message); } }
   if(!doc){ try{ const r = await fetch(DATA + '?t=' + Date.now()); if(r.ok) doc = await r.json(); }catch(_){} }
   reports = (doc && doc.reports) || [];
+  const rid = new URLSearchParams(location.search).get('r');
+  if(rid && reports.some(x => x.id === rid)) view = {name:'detail', id: rid};
   render();
   if(EDIT && !getToken()) toast('保存するには「GitHub連携」でトークンを設定してください');
 })();
