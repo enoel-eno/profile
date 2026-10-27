@@ -29,6 +29,8 @@ header{margin-bottom:28px}
 h1{font-family:var(--f-display);font-weight:800;font-size:clamp(28px,6vw,40px);letter-spacing:.06em;margin:0;line-height:1.3}
 h1 svg{width:.8em;height:.8em;vertical-align:-.06em;margin-right:.3em}
 header p{margin:8px 0 0;color:var(--muted);font-size:14px}
+.plink{color:var(--muted);text-decoration:none}
+.plink:hover{color:var(--ink)}
 svg.i{width:1.1em;height:1.1em;vertical-align:-.17em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 button,.filebtn{font-family:var(--f-body);font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:5px;padding:5px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1.5}
 button:hover,.filebtn:hover{border-color:var(--accent)}
@@ -138,6 +140,7 @@ footer{margin-top:36px;font-size:12px;color:var(--muted)}
   <header>
     <p class="eyebrow">SESSION REPORT</p>
     <h1><svg class="i" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>eNoの卓報告</h1>
+    <p><a class="plink" href="profile.html"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>プロフィール</a></p>
   </header>
   <main id="app"></main>
   <footer class="noprint" id="foot"></footer>
