@@ -149,7 +149,7 @@ footer{margin-top:36px;font-size:12px;color:var(--muted)}
 <dialog id="tk" style="background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:min(480px,92vw)">
   <form method="dialog">
     <h3 style="font-family:var(--f-display);font-weight:800;margin:0 0 8px">GitHub連携</h3>
-    <p class="note" style="margin:0 0 10px">保存先のリポジトリ <b>enoel-eno/session-log</b> だけに、<b>Contents: Read and write</b> の権限を付けたトークンを作って貼り付けてください。<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener" style="color:var(--ink)">トークンを作る</a>　このブラウザの中にだけ保存されます。</p>
+    <p class="note" style="margin:0 0 10px">保存先のリポジトリ <b>enoel-eno/profile</b> だけに、<b>Contents: Read and write</b> の権限を付けたトークンを作って貼り付けてください。<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener" style="color:var(--ink)">トークンを作る</a>　このブラウザの中にだけ保存されます。</p>
     <p class="note" id="tk-state" style="margin:0 0 8px"></p>
     <input type="password" id="tk-in" placeholder="github_pat_…" autocomplete="off" aria-label="トークン">
     <div class="actions"><button class="primary" value="ok">保存</button><button value="clear" class="danger">解除</button><button value="cancel">閉じる</button></div>
@@ -175,7 +175,7 @@ const IC = {
 const ico = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
 
 /* ---- 保存先: GitHub（データ本体と表紙画像をこのリポジトリにコミットする） ---- */
-const REPO = 'enoel-eno/session-log', BRANCH = 'main', DATA = 'takuhokoku-data.json', TOKEN_KEY = 'takuhokoku-token';
+const REPO = 'enoel-eno/profile', BRANCH = 'main', DATA = 'takuhokoku-data.json', TOKEN_KEY = 'takuhokoku-token';
 const getToken = () => { try{ return localStorage.getItem(TOKEN_KEY) || ''; }catch(_){ return ''; } };
 const setToken = t => { try{ t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); }catch(_){} };
 const b64 = s => { const b = new TextEncoder().encode(s); let t = ''; for(let i = 0; i < b.length; i += 0x8000) t += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(t); };
@@ -189,7 +189,7 @@ async function gh(path, opt = {}){
 }
 // 画像は images/ に別ファイルでコミットし、データ側にはパスだけを書く
 // 共有用ページ：SNS などに URL を貼るとスクショ付きのカードになる（r/<id>.html。開くと本体のページへ移る）
-const SITE = 'https://enoel-eno.github.io/session-log/';
+const SITE = 'https://enoel-eno.github.io/profile/';
 const shareUrl = r => `${SITE}r/${r.id}.html`;
 function sharePage(r){
   const cv = r.shots[0], img = cv ? SITE + (cv.path || cv.data) : '';
