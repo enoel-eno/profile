@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>卓報告</title>
-<meta name="description" content="TRPGの卓報告を一覧で見られます。"><meta property="og:type" content="website"><meta property="og:site_name" content="卓報告"><meta property="og:title" content="卓報告"><meta property="og:description" content="TRPGの卓報告を一覧で見られます。"><meta name="robots" content="noindex, nofollow"><link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png"><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>eNoの卓報告</title>
+<meta name="description" content="TRPGの卓報告を一覧で見られます。"><meta property="og:type" content="website"><meta property="og:site_name" content="eNoの卓報告"><meta property="og:title" content="eNoの卓報告"><meta property="og:description" content="TRPGの卓報告を一覧で見られます。"><meta name="robots" content="noindex, nofollow"><link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png"><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap">
 <style id="css">
 :root{
@@ -137,7 +137,7 @@ footer{margin-top:36px;font-size:12px;color:var(--muted)}
 <div class="wrap">
   <header>
     <p class="eyebrow">SESSION REPORT</p>
-    <h1><svg class="i" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>卓報告</h1>
+    <h1><svg class="i" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>eNoの卓報告</h1>
   </header>
   <main id="app"></main>
   <footer class="noprint" id="foot"></footer>
@@ -191,9 +191,9 @@ const shareUrl = r => `${SITE}r/${r.id}.html`;
 function sharePage(r){
   const cv = r.shots[0], img = cv ? SITE + (cv.path || cv.data) : '';
   const desc = [r.kpc ? `${r.kpc} - ${r.gm}` : r.gm, fmtDate(r.date)].filter(Boolean).join(' / ');
-  const t = esc(r.title || '卓報告'), d = esc(desc), to = `../?r=${encodeURIComponent(r.id)}`;
+  const t = esc(r.title || 'eNoの卓報告'), d = esc(desc), to = `../?r=${encodeURIComponent(r.id)}`;
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>${t}</title>
-<meta name="description" content="${d}"><meta property="og:type" content="article"><meta property="og:site_name" content="卓報告"><meta property="og:title" content="${t}"><meta property="og:description" content="${d}"><meta property="og:url" content="${esc(shareUrl(r))}">${img ? `<meta property="og:image" content="${esc(img)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${esc(img)}">` : '<meta name="twitter:card" content="summary">'}
+<meta name="description" content="${d}"><meta property="og:type" content="article"><meta property="og:site_name" content="eNoの卓報告"><meta property="og:title" content="${t}"><meta property="og:description" content="${d}"><meta property="og:url" content="${esc(shareUrl(r))}">${img ? `<meta property="og:image" content="${esc(img)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${esc(img)}">` : '<meta name="twitter:card" content="summary">'}
 <meta http-equiv="refresh" content="0;url=${to}"><script>location.replace(${JSON.stringify(to)})<\/script></head><body><a href="${to}">${t}</a></body></html>`;
 }
 async function putFile(path, content, message){
@@ -343,7 +343,7 @@ function renderDetail(){
     </article>
     <div class="actions noprint">
       ${EDIT ? `<button class="primary" data-act="edit">${ico('edit')}編集</button>` : ''}
-      <button data-act="copytext">${ico('copy')}報告文をコピー</button>
+      <button data-act="copytext">${ico('copy')}卓報告文をコピー</button>
       ${EDIT ? `<button class="danger ghost" data-act="del" style="margin-left:auto">${ico('trash')}削除</button>` : ''}
     </div>`;
 }
