@@ -221,7 +221,8 @@ let reports = [], view = {name:'list'}, draft = null, query = '', role = 'all';
 const isKp = r => /えの|eno/i.test(r.gm || "");
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-const blank = () => ({id: uid(), title:'', date: today(), gm:'', kpc:'', result:'', table:'', system:'Call of Cthulhu', players:[{ho:'HO1', pl:'', pc:''}], shots:[], created: Date.now()});
+const SYSTEMS = ['Call of Cthulhu', 'Emoklore'];
+const blank = () => ({id: uid(), title:'', date: today(), gm:'', kpc:'', result:'', system:'Call of Cthulhu', players:[{ho:'HO1', pl:'', pc:''}], shots:[], created: Date.now()});
 const fmtDate = d => d ? d.replace(/-/g, '/') : '日付なし';
 
 function toast(msg){
@@ -242,7 +243,7 @@ const bold = t => [...t].map(c => { const n = c.charCodeAt(0);
 function reportText(r){
   const blocks = [];
   blocks.push((r.system ? bold(r.system.toLowerCase()) + '\n' : '') + (r.title || '無題'));
-  if(r.gm || r.kpc) blocks.push(bold(r.kpc ? roleLabel(r) : (r.role || 'KP')) + '\n' + (r.kpc ? r.kpc + ' - ' + r.gm : r.gm));
+  if(r.gm || r.kpc) blocks.push(bold(r.kpc ? roleLabel(r) : gmName(r)) + '\n' + (r.kpc ? r.kpc + ' - ' + r.gm : r.gm));
   const ps = r.players.filter(p => p.pl || p.pc);
   if(ps.length) blocks.push([bold('PC - PL'), ...ps.map(pcLine)].join('\n'));
   blocks.push(fmtDate(r.date));
@@ -289,7 +290,8 @@ function playerChips(r){
 }
 
 // KP/DL の呼び分け（DL のときの NPC は DPC）
-const roleLabel = r => r.role === 'DL' ? 'DPC - DL' : 'KPC - KP';
+const gmName = r => r.system === 'Emoklore' ? 'DL' : 'KP', pcName = r => r.system === 'Emoklore' ? 'DPC' : 'KPC';
+const roleLabel = r => `${pcName(r)} - ${gmName(r)}`;
 const pcLine = p => [[p.ho, p.pc].filter(Boolean).join(' '), p.pl].filter(Boolean).join(' - ');
 function card(r){
   const ps = r.players.filter(p => p.pc || p.pl);
@@ -297,7 +299,7 @@ function card(r){
   return `<li><button class="card" data-open="${r.id}">
     <div class="cover">${cv ? `<img src="${cv.data}" alt="">` : ''}<h2 class="${cv ? 'on' : ''}">${esc(r.title || '無題')}</h2></div>
     <div class="cbody">
-      ${r.gm || r.kpc ? `<div class="blk"><b>${r.kpc ? roleLabel(r) : (r.role || 'KP')}</b><span>${esc(r.kpc ? r.kpc + ' - ' + r.gm : r.gm)}</span></div>` : ''}
+      ${r.gm || r.kpc ? `<div class="blk"><b>${r.kpc ? roleLabel(r) : gmName(r)}</b><span>${esc(r.kpc ? r.kpc + ' - ' + r.gm : r.gm)}</span></div>` : ''}
       ${ps.length ? `<div class="blk"><b>PC - PL</b>${ps.map(p => `<span>${esc(pcLine(p))}</span>`).join('')}</div>` : ''}
       <div class="cfoot"><span class="m">${fmtDate(r.date)}</span>${esc(r.result)}</div>
     </div></button></li>`;
@@ -309,7 +311,7 @@ function renderList(){
   cnt.pl = cnt.all - cnt.kp;
   const rows = sorted
     .filter(r => role === 'all' || (role === 'kp') === isKp(r))
-    .filter(r => !q ||[r.title, r.gm, r.kpc, r.result, r.table, r.system, ...r.players.flatMap(p => [p.pl, p.pc, p.ho])].join(' ').toLowerCase().includes(q));
+    .filter(r => !q ||[r.title, r.gm, r.kpc, r.result, r.system, ...r.players.flatMap(p => [p.pl, p.pc, p.ho])].join(' ').toLowerCase().includes(q));
   app.innerHTML = `
     <div class="bar noprint">
       <input class="grow" type="search" id="q" placeholder="シナリオ名・GM・PL・PC名で検索" value="${esc(query)}" aria-label="検索">
@@ -328,14 +330,14 @@ function renderDetail(){
   const r = reports.find(x => x.id === view.id);
   if(!r) return go({name:'list'});
   const ps = r.players.filter(p => p.pl || p.pc), cv = r.shots[0], rest = r.shots.slice(1);
-  const meta = [r.system, r.table].filter(Boolean);
+  const meta = [r.system].filter(Boolean);
   app.innerHTML = `
     <button class="back noprint" data-act="list">← 一覧に戻る</button>
     <article class="read">
       <div class="hero${cv ? ' has' : ''}">${cv ? `<img src="${cv.data}" alt="" data-zoom="${cv.id}">` : ''}<h2>${esc(r.title || '無題')}</h2></div>
       <p class="rmeta"><span class="m">${fmtDate(r.date)}</span>${meta.map(t => `<span>${esc(t)}</span>`).join('')}${r.result ? `<span class="res">${esc(r.result)}</span>` : ''}</p>
       <div class="credits">
-        ${r.gm || r.kpc ? `<section><h3>${r.kpc ? roleLabel(r) : (r.role || 'KP')}</h3><p>${esc(r.kpc ? r.kpc + ' - ' + r.gm : r.gm)}</p></section>` : ''}
+        ${r.gm || r.kpc ? `<section><h3>${r.kpc ? roleLabel(r) : gmName(r)}</h3><p>${esc(r.kpc ? r.kpc + ' - ' + r.gm : r.gm)}</p></section>` : ''}
         ${ps.length ? `<section><h3>PC - PL</h3>${ps.map(p => `<p>${esc(pcLine(p))}</p>`).join('')}</section>` : ''}
       </div>
       ${rest.length ? `<section class="gal"><h3>スクリーンショット</h3><div>${rest.map(s =>
@@ -356,10 +358,9 @@ function renderEdit(){
       <div class="panel"><h3>基本情報</h3><div class="fgrid">
         <div class="field full"><label class="lab" for="f-title">シナリオ名</label><input type="text" id="f-title" value="${esc(r.title)}"></div>
         <div class="field"><label class="lab" for="f-date">日付</label><input type="date" id="f-date" value="${esc(r.date)}"></div>
-        <div class="field"><label class="lab" for="f-system">システム</label><input type="text" id="f-system" value="${esc(r.system)}"></div>
-        <div class="field"><label class="lab" for="f-table">卓名</label><input type="text" id="f-table" value="${esc(r.table)}"></div>
-        <div class="field"><label class="lab" for="f-gm">KP / DL</label><div style="display:flex;gap:6px"><select id="f-role" style="width:76px;flex:none" aria-label="呼び方"><option ${r.role !== 'DL' ? 'selected' : ''}>KP</option><option ${r.role === 'DL' ? 'selected' : ''}>DL</option></select><input type="text" id="f-gm" value="${esc(r.gm)}"></div></div>
-        <div class="field"><label class="lab" for="f-kpc">KPC（任意）</label><input type="text" id="f-kpc" value="${esc(r.kpc)}"></div>
+        <div class="field"><label class="lab" for="f-system">システム</label><select id="f-system">${SYSTEMS.map(s => `<option ${r.system === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+        <div class="field"><label class="lab" for="f-gm" id="l-gm">${gmName(r)}</label><input type="text" id="f-gm" value="${esc(r.gm)}"></div>
+        <div class="field"><label class="lab" for="f-kpc" id="l-kpc">${pcName(r)}（任意）</label><input type="text" id="f-kpc" value="${esc(r.kpc)}"></div>
         <div class="field"><label class="lab" for="f-result">結果</label><input type="text" id="f-result" value="${esc(r.result)}" list="rlist" placeholder="例：両生還"></div>
       </div></div>
 
@@ -394,6 +395,7 @@ function renderEdit(){
     try{ await publish(`卓報告：${draft.title || '無題'}を${i < 0 ? '追加' : '更新'}`, draft); toast('保存しました。公開ページへの反映には1分ほどかかります'); go({name:'detail', id: draft.id}); }
     catch(err){ reports = prev; btn.disabled = false; btn.innerHTML = label; alert('保存できませんでした：' + err.message); }
   });
+  $('#f-system').addEventListener('change', e => { const s = {system: e.target.value}; $('#l-gm').textContent = gmName(s); $('#l-kpc').textContent = pcName(s) + '（任意）'; });
   $('#pick').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
   const drop = $('#drop');
   ['dragenter','dragover'].forEach(n => drop.addEventListener(n, e => { e.preventDefault(); drop.classList.add('on'); }));
@@ -403,7 +405,7 @@ function renderEdit(){
 function syncDraft(){
   if(!$('#f-title')) return;
   draft.title = $('#f-title').value.trim(); draft.date = $('#f-date').value;
-  draft.system = $('#f-system').value.trim(); draft.table = $('#f-table').value.trim(); draft.gm = $('#f-gm').value.trim(); draft.kpc = $('#f-kpc').value.trim(); draft.role = $('#f-role').value; draft.result = $('#f-result').value.trim();
+  draft.system = $('#f-system').value; draft.gm = $('#f-gm').value.trim(); draft.kpc = $('#f-kpc').value.trim(); draft.result = $('#f-result').value.trim();
   document.querySelectorAll('[data-p]').forEach(el => { draft.players[+el.dataset.i][el.dataset.p] = el.value.trim(); });
   document.querySelectorAll('[data-cap]').forEach(el => { draft.shots[+el.dataset.cap].caption = el.value.trim(); });
 }
