@@ -58,6 +58,24 @@ summary .n{font-family:var(--f-mono);font-size:12px;font-weight:500;color:var(--
 ul.items{list-style:none;margin:0;padding:2px 2px 14px 20px;columns:2;column-gap:28px}
 ul.items li{break-inside:avoid;padding:2px 0;font-size:14px;line-height:1.55}
 ul.items .ho{font-size:11px;color:var(--muted);margin-left:6px;white-space:nowrap}
+.add{display:flex;gap:8px;margin:2px 2px 12px 20px}
+.add input{flex:1 1 0;min-width:0}
+.add .ho-in{flex:0 0 120px}
+.add.grp{margin:14px 0 0}
+input[type=text],input[type=password]{font-family:var(--f-body);font-size:14px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);padding:6px 10px}
+button{font-family:var(--f-body);font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:5px;padding:5px 11px;cursor:pointer;line-height:1.5}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:700}
+button:disabled{opacity:.5;cursor:default}
+li .x{border:0;background:none;color:var(--muted);padding:0 6px;margin-left:4px;font-size:15px;line-height:1}
+li .x:hover{color:#c0392b}
+.savebar{position:sticky;bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:8px}
+.savebar span{flex:1;font-size:13px;color:var(--muted)}
+.note{font-size:12px;color:var(--muted);margin:6px 0 0}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:7px 16px;border-radius:6px;font-size:13px;z-index:9}
+.toast[hidden]{display:none}
+@media (max-width:620px){.add .ho-in{flex-basis:90px}}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media (max-width:620px){ul.items{columns:1}.who img{width:52px;height:52px}.cover img{aspect-ratio:2/1}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -72,17 +90,91 @@ ul.items .ho{font-size:11px;color:var(--muted);margin-left:6px;white-space:nowra
   <div class="cover"><img src="profile/cover.jpg" alt=""><a class="go" href="session-log.html"><svg class="i" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>卓報告一覧</a></div>
   <main id="app"></main>
 </div>
+<dialog id="tk" style="background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:min(480px,92vw)">
+  <form method="dialog">
+    <p style="margin:0 0 10px;font-weight:700">GitHub連携</p>
+    <p class="note">保存先のリポジトリ <b>enoel-eno/profile</b> だけに、<b>Contents: Read and write</b> を付けたトークンを貼ってください。このブラウザの中にだけ保存されます。</p>
+    <p class="note" id="tk-state"></p>
+    <input type="password" id="tk-in" autocomplete="off" placeholder="github_pat_…" style="width:100%;margin:8px 0 14px">
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button value="clear">解除</button><button value="cancel">閉じる</button><button value="ok" class="primary">保存</button></div>
+  </form>
+</dialog>
+<div class="toast" id="toast" hidden></div>
 <script>
-if(/[?&](edit|r=)/.test(location.search)) location.replace('session-log.html' + location.search);
+if(/[?&]r=/.test(location.search)) location.replace('session-log.html' + location.search);
+const REPO = 'enoel-eno/profile', BRANCH = 'main', DATA = 'profile/profile-data.json', TOKEN_KEY = 'takuhokoku-token';
+const EDIT = /[?&]edit\b/.test(location.search);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-fetch('profile/profile-data.json?t=' + Date.now()).then(r => r.json()).then(d => {
-  document.getElementById('name').textContent = d.name;
+const $ = s => document.querySelector(s);
+const getToken = () => { try{ return localStorage.getItem(TOKEN_KEY) || ''; }catch(_){ return ''; } };
+const setToken = t => { try{ t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); }catch(_){} };
+const b64 = s => { const b = new TextEncoder().encode(s); let t = ''; for(let i = 0; i < b.length; i += 0x8000) t += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(t); };
+const unb64 = s => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g, '')), c => c.charCodeAt(0)));
+async function gh(opt = {}){
+  const url = `https://api.github.com/repos/${REPO}/contents/${DATA}` + (opt.method ? '' : `?ref=${BRANCH}&t=${Date.now()}`);
+  const r = await fetch(url, {...opt, headers:{Accept:'application/vnd.github+json', Authorization:'Bearer ' + getToken()}});
+  if(!r.ok) throw new Error(r.status === 401 ? 'トークンが正しくないか、期限が切れています' : r.status === 403 ? 'このリポジトリに書き込む権限がありません' : r.status === 409 || r.status === 422 ? '他で更新されています。ページを開き直してやり直してください' : `GitHub のエラー（${r.status}）`);
+  return r.json();
+}
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => { t.hidden = true; }, 2200); }
+
+let d = null, sha = '', dirty = false;
+const opened = new Set();
+function render(){
   const total = d.passed.reduce((a, g) => a + g.items.length, 0);
-  document.getElementById('app').innerHTML = `
+  $('#name').textContent = d.name;
+  $('#app').innerHTML = `
     <section class="panel"><h2>日程</h2><dl class="sch">${d.schedule.map(([k, v]) => `<dt>${esc(k)}</dt><dd class="${/\d/.test(v) ? 't' : ''}">${esc(v)}</dd>`).join('')}</dl></section>
     <section class="panel tend"><h2>傾向</h2>${d.tendency.map(t => { const m = t.match(/^(地雷)[：:](.*)$/); return m ? `<p><span class="lab">${m[1]}</span>${esc(m[2])}</p>` : `<p>${esc(t)}</p>`; }).join('')}</section>
-    <section class="panel"><h2>通過済み卓<span class="n">${total}</span></h2>${d.passed.map(g => `<details><summary>${esc(g.name)}<span class="n">${g.items.length}</span></summary><ul class="items">${g.items.map(i => `<li>${esc(i.t)}${i.ho ? `<span class="ho">${esc(i.ho)}</span>` : ''}</li>`).join('')}</ul></details>`).join('')}</section>`;
+    <section class="panel"><h2>通過済み卓<span class="n">${total}</span></h2>${d.passed.map((g, gi) => `<details data-g="${gi}"${opened.has(g.name) ? ' open' : ''}><summary>${esc(g.name)}<span class="n">${g.items.length}</span></summary>
+      ${EDIT ? `<form class="add" data-add="${gi}"><input type="text" name="t" placeholder="シナリオ名" aria-label="シナリオ名" required><input type="text" name="ho" class="ho-in" placeholder="HO（任意）" aria-label="HO"><button class="primary" type="submit">追加</button></form>` : ''}
+      <ul class="items">${g.items.map((i, ii) => `<li>${esc(i.t)}${i.ho ? `<span class="ho">${esc(i.ho)}</span>` : ''}${EDIT ? `<button type="button" class="x" data-del="${gi}.${ii}" aria-label="「${esc(i.t)}」を削除">×</button>` : ''}</li>`).join('')}</ul></details>`).join('')}
+      ${EDIT ? `<form class="add grp" id="addg"><input type="text" name="n" placeholder="新しい区分（例：7PL）" aria-label="区分名" required><button type="submit">区分を追加</button></form>` : ''}</section>
+    ${EDIT ? `<div class="savebar"><span>${dirty ? '未保存の変更があります' : 'すべて保存済みです'}</span><button class="primary" id="save"${dirty ? '' : ' disabled'}>保存</button><button id="tkbtn">GitHub連携（${getToken() ? '設定済み' : '未設定'}）</button></div>` : ''}`;
+  document.querySelectorAll('details').forEach(el => el.addEventListener('toggle', () => { const n = d.passed[+el.dataset.g].name; el.open ? opened.add(n) : opened.delete(n); }));
+  if(!EDIT) return;
+  document.querySelectorAll('form[data-add]').forEach(f => f.addEventListener('submit', e => {
+    e.preventDefault(); const g = d.passed[+f.dataset.add], t = f.t.value.trim(); if(!t) return;
+    g.items.unshift({t, ho: f.ho.value.trim()}); dirty = true; opened.add(g.name); render();
+  }));
+  document.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+    const [gi, ii] = b.dataset.del.split('.').map(Number), it = d.passed[gi].items[ii];
+    if(!confirm(`「${it.t}」を削除します。`)) return;
+    d.passed[gi].items.splice(ii, 1); dirty = true; opened.add(d.passed[gi].name); render();
+  }));
+  $('#addg').addEventListener('submit', e => {
+    e.preventDefault(); const n = e.target.n.value.trim(); if(!n) return;
+    if(d.passed.some(g => g.name === n)) return toast('同じ名前の区分があります');
+    d.passed.push({name: n, items: []}); dirty = true; opened.add(n); render();
+  });
+  $('#save').addEventListener('click', save);
+  $('#tkbtn').addEventListener('click', openToken);
+}
+async function save(){
+  if(!getToken()) return openToken();
+  const btn = $('#save'); btn.disabled = true; btn.textContent = '保存中…';
+  try{
+    const res = await gh({method:'PUT', body: JSON.stringify({message: 'プロフィール：通過済み卓を更新', content: b64(JSON.stringify(d)), branch: BRANCH, sha})});
+    sha = res.content.sha; dirty = false; toast('保存しました。公開ページへの反映には1分ほどかかります');
+  }catch(err){ alert('保存できませんでした：' + err.message); }
+  render();
+}
+function openToken(){ $('#tk-in').value = ''; $('#tk-state').textContent = getToken() ? '設定済みです（入力すると置き換えます）。' : '未設定です。'; $('#tk').showModal(); }
+$('#tk').addEventListener('submit', e => {
+  const v = $('#tk-in').value.trim(), act = e.submitter && e.submitter.value;
+  if(act === 'cancel') return;
+  if(act === 'clear') setToken(''); else if(v){ setToken(v); location.reload(); return; }
+  render();
 });
+window.addEventListener('beforeunload', e => { if(dirty){ e.preventDefault(); e.returnValue = ''; } });
+(async () => {
+  try{
+    if(EDIT && getToken()){ const f = await gh(); sha = f.sha; d = JSON.parse(unb64(f.content)); }
+  }catch(err){ toast(err.message); }
+  if(!d) d = await (await fetch(DATA + '?t=' + Date.now())).json();
+  render();
+  if(EDIT && !getToken()) toast('保存するには「GitHub連携」でトークンを設定してください');
+})();
 </script>
 </body>
 </html>
