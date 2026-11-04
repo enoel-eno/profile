@@ -204,6 +204,26 @@ async function putFile(path, content, message){
   const cur = await gh(path);
   await gh(path, {method:'PUT', body: JSON.stringify({message, content, branch: BRANCH, ...(cur ? {sha: cur.sha} : {})})});
 }
+// PL で通った卓は、プロフィールの「通過済み卓」にも自動で追加する（KP卓は対象外。すでにある卓は追加しない）
+const PROFILE_DATA = 'profile/profile-data.json';
+const isMe = s => /えの|eno/i.test(s || '');
+const normT = s => s.normalize('NFKC').toLowerCase().replace(/[\s~〜～・･.,!?！？、。'’"「」『』()（）\-ー—–_:：;；]/g, '');
+function profileEntry(r){
+  if(isMe(r.gm)) return null;
+  const ps = r.players.filter(p => p.pl || p.pc), me = ps.find(p => isMe(p.pl));
+  if(!me) return null;
+  return {group: r.system === 'Emoklore' ? 'エモクロア' : ps.length + 'PL', item: {t: r.title, ho: ps.length >= 2 ? (me.ho || '') : ''}};
+}
+async function syncProfile(r){
+  const e = profileEntry(r); if(!e || !r.title) return false;
+  const f = await gh(PROFILE_DATA), pd = JSON.parse(unb64(f.content)), n = normT(r.title);
+  if(pd.passed.some(g => g.items.some(i => { const x = normT(i.t); return x === n || (x.length >= 4 && n.length >= 4 && (x.startsWith(n) || n.startsWith(x))); }))) return false;
+  let g = pd.passed.find(g => g.name === e.group);
+  if(!g){ g = {name: e.group, items: []}; const at = pd.passed.reduce((a, x, k) => /^\d+PL$/.test(x.name) ? k + 1 : a, 0); pd.passed.splice(/^\d+PL$/.test(e.group) ? at : pd.passed.length, 0, g); }
+  g.items.push(e.item);
+  await gh(PROFILE_DATA, {method:'PUT', body: JSON.stringify({message: `プロフィール：${r.title}を通過済み卓に追加`, content: b64(JSON.stringify(pd)), branch: BRANCH, sha: f.sha})});
+  return true;
+}
 async function publish(message, saved, removedId){
   for(const r of reports) for(const s of r.shots){
     if(!s.data.startsWith('data:')) continue;
@@ -231,7 +251,7 @@ const fmtDate = d => d ? d.replace(/-/g, '/') : '日付なし';
 
 function toast(msg){
   const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
-  document.body.appendChild(t); setTimeout(() => t.remove(), 1600);
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2800);
 }
 async function copy(text){
   try{ await navigator.clipboard.writeText(text); toast('コピーしました'); }
@@ -396,7 +416,10 @@ function renderEdit(){
     const prev = reports.slice(), i = reports.findIndex(x => x.id === draft.id), btn = e.submitter, label = btn.innerHTML;
     i < 0 ? reports.push(draft) : reports[i] = draft;
     btn.disabled = true; btn.textContent = '保存中…';
-    try{ await publish(`卓報告：${draft.title || '無題'}を${i < 0 ? '追加' : '更新'}`, draft); toast('保存しました。公開ページへの反映には1分ほどかかります'); go({name:'detail', id: draft.id}); }
+    try{ await publish(`卓報告：${draft.title || '無題'}を${i < 0 ? '追加' : '更新'}`, draft);
+      let added = false, perr = '';
+      try{ added = await syncProfile(draft); }catch(err){ perr = err.message; }
+      toast(perr ? 'プロフィールへの追加に失敗しました：' + perr : added ? '保存しました。プロフィールの通過済み卓にも追加しました（反映には1分ほどかかります）' : '保存しました。公開ページへの反映には1分ほどかかります'); go({name:'detail', id: draft.id}); }
     catch(err){ reports = prev; btn.disabled = false; btn.innerHTML = label; alert('保存できませんでした：' + err.message); }
   });
   $('#f-system').addEventListener('change', e => { const s = {system: e.target.value}; $('#l-gm').textContent = gmName(s); $('#l-kpc').textContent = pcName(s) + '（任意）'; });
