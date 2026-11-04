@@ -74,6 +74,17 @@ li .x:disabled{opacity:.25;cursor:default}
 li[data-pos]{display:flex;align-items:baseline;gap:6px;cursor:grab;border-radius:5px;padding:2px 4px;margin-left:-4px}
 li[data-pos] .tt{flex:1;min-width:0}
 li[data-pos] .ctl{flex:none;display:inline-flex;gap:0}
+.hint{margin:0 0 14px;font-size:12px;color:var(--muted)}
+[data-e]{cursor:text}
+[data-e]:hover{background:var(--soft);border-radius:4px}
+.inl{font-family:var(--f-body);font-size:inherit;border:1px solid var(--accent);border-radius:5px;background:var(--surface);color:var(--ink);padding:2px 6px;width:100%;min-width:0}
+li .tt .inl+.inl{width:90px;margin-left:6px;flex:none}
+li .tt:has(.inl){display:flex;gap:0}
+h1 .inl{font-family:var(--f-display);font-weight:800;font-size:inherit;letter-spacing:inherit}
+dl.sch.ed{grid-template-columns:auto 1fr auto}
+dl.sch dd.rm{text-align:right}
+.tend p .x{margin-left:6px}
+.addrow{margin-top:10px}
 li.dragging{opacity:.4}
 li.over{background:var(--soft);outline:1px dashed var(--accent)}
 .savebar{position:sticky;bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:8px}
@@ -129,14 +140,15 @@ let d = null, sha = '', dirty = false;
 const opened = new Set();
 function render(){
   const total = d.passed.reduce((a, g) => a + g.items.length, 0);
-  $('#name').textContent = d.name;
+  $('#name').textContent = d.name; if(EDIT) $('#name').dataset.e = 'name';
   $('#app').innerHTML = `
-    <section class="panel"><h2>日程</h2><dl class="sch">${d.schedule.map(([k, v]) => `<dt>${esc(k)}</dt><dd class="${/\d/.test(v) ? 't' : ''}">${esc(v)}</dd>`).join('')}</dl></section>
-    <section class="panel tend"><h2>傾向</h2>${d.tendency.map(t => { const m = t.match(/^(地雷)[：:](.*)$/); return m ? `<p><span class="lab">${m[1]}</span>${esc(m[2])}</p>` : `<p>${esc(t)}</p>`; }).join('')}</section>
+    ${EDIT ? `<p class="hint">編集モード：文字をダブルクリックすると編集できます（Enterで確定、Escで取り消し）。</p>` : ''}
+    <section class="panel"><h2>日程</h2><dl class="sch${EDIT ? ' ed' : ''}">${d.schedule.map(([k, v], i) => `<dt${EDIT ? ` data-e="sch.${i}.0"` : ''}>${esc(k)}</dt><dd class="${/\d/.test(v) ? 't' : ''}"${EDIT ? ` data-e="sch.${i}.1"` : ''}>${esc(v)}</dd>${EDIT ? `<dd class="rm"><button type="button" class="x" data-rmsch="${i}" aria-label="この行を削除">×</button></dd>` : ''}`).join('')}</dl>${EDIT ? `<div class="addrow"><button type="button" id="addsch">行を追加</button></div>` : ''}</section>
+    <section class="panel tend"><h2>傾向</h2>${d.tendency.map((t, i) => { const m = t.match(/^(地雷)[：:](.*)$/), e = EDIT ? ` data-e="tend.${i}"` : '', x = EDIT ? `<button type="button" class="x" data-rmtend="${i}" aria-label="この項目を削除">×</button>` : ''; return m ? `<p${e}><span class="lab">${m[1]}</span>${esc(m[2])}${x}</p>` : `<p${e}>${esc(t)}${x}</p>`; }).join('')}${EDIT ? `<div class="addrow"><button type="button" id="addtend">項目を追加</button></div>` : ''}</section>
     <section class="panel"><h2>通過済み卓<span class="n">${total}</span></h2>${d.passed.map((g, gi) => `<details data-g="${gi}"${opened.has(g.name) ? ' open' : ''}><summary>${esc(g.name)}<span class="n">${g.items.length}</span></summary>
       ${EDIT ? `<form class="add" data-add="${gi}"><input type="text" name="t" placeholder="シナリオ名" aria-label="シナリオ名" required><input type="text" name="ho" class="ho-in" placeholder="HO（任意）" aria-label="HO"><button class="primary" type="submit">追加</button></form>` : ''}
       <ul class="items">${g.items.map((i, ii) => EDIT
-        ? `<li draggable="true" data-pos="${gi}.${ii}"><span class="tt">${esc(i.t)}${i.ho ? `<span class="ho">${esc(i.ho)}</span>` : ''}</span><span class="ctl"><button type="button" class="x" data-mv="${gi}.${ii}.-1" aria-label="上へ"${ii ? '' : ' disabled'}>↑</button><button type="button" class="x" data-mv="${gi}.${ii}.1" aria-label="下へ"${ii < g.items.length - 1 ? '' : ' disabled'}>↓</button><button type="button" class="x" data-del="${gi}.${ii}" aria-label="「${esc(i.t)}」を削除">×</button></span></li>`
+        ? `<li draggable="true" data-pos="${gi}.${ii}"><span class="tt" data-e="item.${gi}.${ii}">${esc(i.t)}${i.ho ? `<span class="ho">${esc(i.ho)}</span>` : ''}</span><span class="ctl"><button type="button" class="x" data-mv="${gi}.${ii}.-1" aria-label="上へ"${ii ? '' : ' disabled'}>↑</button><button type="button" class="x" data-mv="${gi}.${ii}.1" aria-label="下へ"${ii < g.items.length - 1 ? '' : ' disabled'}>↓</button><button type="button" class="x" data-del="${gi}.${ii}" aria-label="「${esc(i.t)}」を削除">×</button></span></li>`
         : `<li>${esc(i.t)}${i.ho ? `<span class="ho">${esc(i.ho)}</span>` : ''}</li>`).join('')}</ul></details>`).join('')}
       ${EDIT ? `<form class="add grp" id="addg"><input type="text" name="n" placeholder="新しい区分（例：7PL）" aria-label="区分名" required><button type="submit">区分を追加</button></form>` : ''}</section>
     ${EDIT ? `<div class="savebar"><span>${dirty ? '未保存の変更があります' : 'すべて保存済みです'}</span><button class="primary" id="save"${dirty ? '' : ' disabled'}>保存</button><button id="tkbtn">GitHub連携（${getToken() ? '設定済み' : '未設定'}）</button></div>` : ''}`;
@@ -151,6 +163,16 @@ function render(){
     if(to < 0 || to >= a.length) return;
     [a[ii], a[to]] = [a[to], a[ii]]; dirty = true; opened.add(d.passed[gi].name); render();
   }));
+  document.querySelectorAll('[data-rmsch]').forEach(b => b.addEventListener('click', () => {
+    const r = d.schedule[+b.dataset.rmsch]; if(!confirm(`「${r[0]}　${r[1]}」の行を削除します。`)) return;
+    d.schedule.splice(+b.dataset.rmsch, 1); dirty = true; render();
+  }));
+  document.querySelectorAll('[data-rmtend]').forEach(b => b.addEventListener('click', () => {
+    if(!confirm('この項目を削除します。')) return;
+    d.tendency.splice(+b.dataset.rmtend, 1); dirty = true; render();
+  }));
+  $('#addsch').addEventListener('click', () => { d.schedule.push(['曜日', '時間']); dirty = true; render(); });
+  $('#addtend').addEventListener('click', () => { d.tendency.push('新しい項目'); dirty = true; render(); });
   let drag = null;
   document.querySelectorAll('li[data-pos]').forEach(li => {
     li.addEventListener('dragstart', e => { drag = li.dataset.pos.split('.').map(Number); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', li.dataset.pos); li.classList.add('dragging'); });
@@ -178,6 +200,33 @@ function render(){
   $('#save').addEventListener('click', save);
   $('#tkbtn').addEventListener('click', openToken);
 }
+// ダブルクリックでその場編集（日程・傾向・名前・通過済み卓のタイトルとHO）
+function startEdit(el){
+  if(el.querySelector('input')) return;
+  const k = el.dataset.e.split('.'), li = el.closest('li');
+  let done = false;
+  const finish = (ok, apply) => { if(done) return; done = true; if(ok){ apply(); dirty = true; } render(); };
+  if(k[0] === 'item'){
+    const it = d.passed[+k[1]].items[+k[2]];
+    el.innerHTML = `<input type="text" class="inl t" value="${esc(it.t)}" aria-label="シナリオ名"><input type="text" class="inl h" value="${esc(it.ho)}" placeholder="HO" aria-label="HO">`;
+    if(li) li.draggable = false;
+    const [ti, hi] = el.querySelectorAll('input');
+    const commit = () => { const t = ti.value.trim(), ho = hi.value.trim(); finish(t && (t !== it.t || ho !== it.ho), () => { it.t = t; it.ho = ho; }); };
+    el.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); commit(); } else if(e.key === 'Escape') finish(false); });
+    el.addEventListener('focusout', () => setTimeout(() => { if(!el.contains(document.activeElement)) commit(); }, 0));
+    ti.focus(); ti.select(); return;
+  }
+  const get = () => k[0] === 'name' ? d.name : k[0] === 'sch' ? d.schedule[+k[1]][+k[2]] : d.tendency[+k[1]];
+  const set = v => { if(k[0] === 'name') d.name = v; else if(k[0] === 'sch') d.schedule[+k[1]][+k[2]] = v; else d.tendency[+k[1]] = v; };
+  const cur = get();
+  el.innerHTML = `<input type="text" class="inl" value="${esc(cur)}">`;
+  const inp = el.querySelector('input');
+  const commit = () => { const v = inp.value.trim(); finish(v && v !== cur, () => set(v)); };
+  inp.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); commit(); } else if(e.key === 'Escape') finish(false); });
+  inp.addEventListener('blur', commit);
+  inp.focus(); inp.select();
+}
+if(EDIT) document.addEventListener('dblclick', e => { const el = e.target.closest && e.target.closest('[data-e]'); if(el && !e.target.closest('button')) { window.getSelection().removeAllRanges(); startEdit(el); } });
 async function save(){
   if(!getToken()) return openToken();
   const btn = $('#save'); btn.disabled = true; btn.textContent = '保存中…';
