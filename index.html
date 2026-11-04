@@ -70,7 +70,6 @@ button:disabled{opacity:.5;cursor:default}
 li .x{border:0;background:none;color:var(--muted);padding:0 5px;font-size:14px;line-height:1.4}
 li .x:hover{color:var(--ink)}
 li .x[data-del]:hover{color:#c0392b}
-li .x:disabled{opacity:.25;cursor:default}
 li[data-pos]{display:flex;align-items:baseline;gap:6px;cursor:grab;border-radius:5px;padding:2px 4px;margin-left:-4px}
 li[data-pos] .tt{flex:1;min-width:0}
 li[data-pos] .ctl{flex:none;display:inline-flex;gap:0}
@@ -148,7 +147,7 @@ function render(){
     <section class="panel"><h2>通過済み卓<span class="n">${total}</span></h2>${d.passed.map((g, gi) => `<details data-g="${gi}"${opened.has(g.name) ? ' open' : ''}><summary>${esc(g.name)}<span class="n">${g.items.length}</span></summary>
       ${EDIT ? `<form class="add" data-add="${gi}"><input type="text" name="t" placeholder="シナリオ名" aria-label="シナリオ名" required><input type="text" name="ho" class="ho-in" placeholder="HO（任意）" aria-label="HO"><button class="primary" type="submit">追加</button></form>` : ''}
       <ul class="items">${g.items.map((i, ii) => EDIT
-        ? `<li draggable="true" data-pos="${gi}.${ii}"><span class="tt" data-e="item.${gi}.${ii}">${esc(i.t)}${i.ho ? `<span class="ho">${esc(i.ho)}</span>` : ''}</span><span class="ctl"><button type="button" class="x" data-mv="${gi}.${ii}.-1" aria-label="上へ"${ii ? '' : ' disabled'}>↑</button><button type="button" class="x" data-mv="${gi}.${ii}.1" aria-label="下へ"${ii < g.items.length - 1 ? '' : ' disabled'}>↓</button><button type="button" class="x" data-del="${gi}.${ii}" aria-label="「${esc(i.t)}」を削除">×</button></span></li>`
+        ? `<li draggable="true" data-pos="${gi}.${ii}"><span class="tt" data-e="item.${gi}.${ii}">${esc(i.t)}${i.ho ? `<span class="ho">${esc(i.ho)}</span>` : ''}</span><span class="ctl"><button type="button" class="x" data-del="${gi}.${ii}" aria-label="「${esc(i.t)}」を削除">×</button></span></li>`
         : `<li>${esc(i.t)}${i.ho ? `<span class="ho">${esc(i.ho)}</span>` : ''}</li>`).join('')}</ul></details>`).join('')}
       ${EDIT ? `<form class="add grp" id="addg"><input type="text" name="n" placeholder="新しい区分（例：7PL）" aria-label="区分名" required><button type="submit">区分を追加</button></form>` : ''}</section>
     ${EDIT ? `<div class="savebar"><span>${dirty ? '未保存の変更があります' : 'すべて保存済みです'}</span><button class="primary" id="save"${dirty ? '' : ' disabled'}>保存</button><button id="tkbtn">GitHub連携（${getToken() ? '設定済み' : '未設定'}）</button></div>` : ''}`;
@@ -157,11 +156,6 @@ function render(){
   document.querySelectorAll('form[data-add]').forEach(f => f.addEventListener('submit', e => {
     e.preventDefault(); const g = d.passed[+f.dataset.add], t = f.t.value.trim(); if(!t) return;
     g.items.push({t, ho: f.ho.value.trim()}); dirty = true; opened.add(g.name); render();
-  }));
-  document.querySelectorAll('[data-mv]').forEach(b => b.addEventListener('click', () => {
-    const [gi, ii, dir] = b.dataset.mv.split('.').map(Number), a = d.passed[gi].items, to = ii + dir;
-    if(to < 0 || to >= a.length) return;
-    [a[ii], a[to]] = [a[to], a[ii]]; dirty = true; opened.add(d.passed[gi].name); render();
   }));
   document.querySelectorAll('[data-rmsch]').forEach(b => b.addEventListener('click', () => {
     const r = d.schedule[+b.dataset.rmsch]; if(!confirm(`「${r[0]}　${r[1]}」の行を削除します。`)) return;
